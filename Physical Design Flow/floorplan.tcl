@@ -1,10 +1,12 @@
 #============================================================
 # floorplan.tcl
-# Version 0 - QUERY ONLY
+# Version 1 - IO PLACEMENT
 #
 # Purpose:
-#   Verify floorplan/database information before making
-#   any physical placement modifications.
+#   1. Query floorplan/database information.
+#   2. Discover PAD and BLOCK instances.
+#   3. Identify required IO PADs.
+#   4. Place required IO PADs adjacently on right side.
 #
 # IMPORTANT:
 #   This version must NOT modify the Innovus database.
@@ -16,7 +18,7 @@
 
 puts ""
 puts "============================================================"
-puts " FLOORPLAN VERSION 0 : QUERY ONLY"
+puts " FLOORPLAN VERSION 1 : IO PLACEMENT"
 puts "============================================================"
 
 #============================================================
@@ -44,22 +46,35 @@ puts "Core Box          : $core_box"
 puts "Core site         : $core_site"
 
 #============================================================
-# 4. Expected IO instances
+# 4. Discover Physical Objects
 #============================================================
-
+# IO instances 
 set io_ptrs [dbget top.insts.cell.baseClass pad -p2 ]
 set io_insts [dbget $io_ptrs.name ]
 
-#============================================================
-# 5. Expected hard macros
-#============================================================
-
+# BLock instances
 set macro_ptrs [dbget top.insts.cell.baseClass block -p2]
 set macro_insts [dbget $macro_ptrs.name]
 
 #============================================================
-# 6. Query/report procedure
+# 5. Helper procedures
 #============================================================
+
+proc find_io_by_keyword { io_ptrs keyword} {
+
+    # find the instance name that match with keyword then, check for the number of matches must be one 
+    set matches [ dbget -e $io_ptrs.name "*$keyword*" ]
+
+    if { [llength $matches ] == 0} {
+        error "IO ERROR : no pad isntance matched keyword: $keyword"
+    }
+
+    if {[llength $matches] > 1} {
+        error "IO ERROR: Multiple PAD instances matched keyword '$keyword': $matches"
+    }
+
+    return [lindex $matches 0]
+}
 
 proc report_instance { inst_name } {
 
@@ -97,7 +112,44 @@ proc report_instance { inst_name } {
 }
 
 #============================================================
-# 7. IO report
+# 6. Identify Required IO
+#============================================================
+set io_vdd    [find_io_by_keyword $io_insts "vdd"]
+set io_vcc    [find_io_by_keyword $io_insts "vcc"]
+set io_vss    [find_io_by_keyword $io_insts "vss"]
+set io_scirst [find_io_by_keyword $io_insts "scirst"]
+set io_sciclk [find_io_by_keyword $io_insts "sciclk"]
+set io_sciio  [find_io_by_keyword $io_insts "sciio"]
+
+#============================================================
+# 7. Build required IO order
+#============================================================
+
+set ordered_io_insts [list \
+    $io_vdd \
+    $io_vcc \
+    $io_vss \
+    $io_scirst \
+    $io_sciclk \
+    $io_sciio \
+]
+
+foreach inst $ordered_io_insts {
+    puts "  $inst"
+}
+
+#============================================================
+# 8. IO Placement
+#============================================================
+# R0 -> N
+# R90 -> W
+# R180 -> S
+# R270 -> E
+# Rotate anti clockwise
+
+
+#============================================================
+# 9. IO report
 #============================================================
 
 puts ""
@@ -154,4 +206,13 @@ foreach inst $io_insts {
 puts ""
 puts "QUERY-ONLY FLOORPLAN SCRIPT COMPLETE"
 puts "No placement modifications performed."
+puts "============================================================"
+
+#============================================================
+# 10. Identify required IO by Keywords
+#============================================================
+
+puts ""
+puts "============================================================"
+puts " Required IO"
 puts "============================================================"
