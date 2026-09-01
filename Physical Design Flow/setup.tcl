@@ -4,7 +4,7 @@
 
 # read the lef files. 
 
-set root_import_dir "/home/vchip9/work_lab/lab2/tools..."
+set .root_import_dir "/home/vchip9/work_lab/lab2/tools.."
 set lib_dir [string join $root_import_dir "/lib"]
 
 # get all the lef files
