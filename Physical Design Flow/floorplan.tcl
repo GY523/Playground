@@ -71,7 +71,7 @@ proc find_io_by_keyword { io_ptrs keyword} {
     set matches [ dbget -e $io_ptrs.name "*$keyword*" ]
 
     if { [llength $matches ] == 0} {
-        error "IO ERROR : no pad isntance matched keyword: $keyword"
+        error "IO ERROR : no pad instance matched keyword: $keyword"
     }
 
     if {[llength $matches] > 1} {
@@ -82,7 +82,7 @@ proc find_io_by_keyword { io_ptrs keyword} {
 }
 
 proc find_macro_by_keyword {macro_ptrs keyword} {
-    set matches [dbget -e top.insts.name "*$keyword*"]
+    set matches [dbget -e $macro_ptrs.name "*$keyword*"]
 
     if { [llength $matches ] == 0} {
         error "IO ERROR : no pad isntance matched keyword: $keyword"
@@ -182,13 +182,13 @@ foreach inst $ordered_io_insts {
     puts "Vertical height after R90 = $master_width"
 
     # Calculate the y placement point
-    set $cursor_y [expr { $cursor_y - $master_width}]
+    set cursor_y [expr { $cursor_y - $master_width}]
 
     # Place instance according to the order of the list
     placeInstance $inst_ptr $io_x $cursor_y $io_orient  
 
     # Move down cursor with value of space.
-    set $cursor_y [expr { $cursor_y - $io_spacing} ]
+    set cursor_y [expr { $cursor_y - $io_spacing} ]
 
 }
 
@@ -230,7 +230,7 @@ set vde_h [dbget $vde_ptr.cell.size_y]
 # Analog placement Parameter
 set analog_right_margin 20.0
 set analog_top_margin   20.0
-set macro_spacing       10.0
+set macro_spacing       30.0
 
 # VR12 - upper right anchor
 set vr12_x [expr {
