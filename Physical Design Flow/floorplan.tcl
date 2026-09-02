@@ -1,12 +1,6 @@
 #============================================================
 # floorplan.tcl
-# Version 1 - IO PLACEMENT
-#
-# Purpose:
-#   1. Query floorplan/database information.
-#   2. Discover PAD and BLOCK instances.
-#   3. Identify required IO PADs.
-#   4. Place required IO PADs adjacently on right side.
+# Version 3 - Digital Macro Placement
 #
 # IMPORTANT:
 #   This version must NOT modify the Innovus database.
@@ -318,6 +312,37 @@ placeInstance $macro_pori $pori_x $pori_y R90
 #============================================================
 set macro_flash [find_macro_by_keyword $macro_ptrs "flash_bist"]
 set macro_sram  [find_macro_by_keyword $macro_ptrs "system_sram"]
+
+#get pointer from name
+set flash_ptr [dbget top.insts.name $macro_flash -p]
+set sram_ptr [dbget top.insts.name $macro_sram -p]
+
+# get width and height: no rotation
+set flash_w [dbget $flash_ptr.cell.size_x]
+set flash_h [dbget $flash_ptr.cell.size_y]
+set sram_w  [dbget $sram_ptr.cell.size_x]
+set sram_h  [dbget $sram_ptr.cell.size_y]
+
+# set margin
+set digital_macro_margin 20.0
+
+# set xy
+set flash_x $core_llx
+set flash_y [expr {
+    $core_ury - $flash_h
+}]
+
+set sram_x [expr {
+    $core_urx - $digital_macro_margin - $sram_w
+}]
+set sram_y [expr {
+    $core_lly + $digital_macro_margin
+}]
+puts "Flash : ($flash_x, $flash_y) R0"
+puts "SRAM  : ($sram_x, $sram_y) R0"
+
+placeInstance $macro_flash $flash_x $flash_y 
+placeInstance $macro_sram  $sram_x $sram_y
 
 echo off
 #============================================================
