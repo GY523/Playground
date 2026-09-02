@@ -81,6 +81,20 @@ proc find_io_by_keyword { io_ptrs keyword} {
     return [lindex $matches 0]
 }
 
+proc find_macro_by_keyword {macro_ptrs keyword} {
+    set matches [dbget -e top.insts.name "*$keyword*"]
+
+    if { [llength $matches ] == 0} {
+        error "IO ERROR : no pad isntance matched keyword: $keyword"
+    }
+
+    if {[llength $matches] > 1} {
+        error "IO ERROR: Multiple PAD instances matched keyword '$keyword': $matches"
+    }
+
+    return [lindex $matches 0]
+}
+
 proc report_instance { inst_name } {
 
     set inst_ptr [dbget -p -e top.insts.name $inst_name]
@@ -179,6 +193,133 @@ foreach inst $ordered_io_insts {
 }
 
 
+#============================================================
+# 9. Identify required Analog macro
+#============================================================
+
+set macro_vr12      [find_macro_by_keyword $macro_ptrs "vr12"]
+set macro_bgr       [find_macro_by_keyword $macro_ptrs "bgr"]
+set macro_bg_buffer [find_macro_by_keyword $macro_ptrs "bg_buffer"]
+set macro_vde       [find_macro_by_keyword $macro_ptrs "u7_vde"]
+
+#============================================================
+# 10. Query width and height
+#============================================================
+
+set vr12_ptr [dbget -p -e top.insts.name $macro_vr12]
+set bgr_ptr         [dbget -p -e top.insts.name $macro_bgr]
+set bg_buffer_ptr   [dbget -p -e top.insts.name $macro_bg_buffer]
+set vde_ptr       [dbget -p -e top.insts.name $macro_vde]
+
+set vr12_w          [dbget $vr12_ptr.cell.size_x]
+set vr12_h          [dbget $vr12_ptr.cell.size_y]
+
+set bgr_w [dbget $bgr_ptr.cell.size_x]
+set bgr_h [dbget $bgr_ptr.cell.size_y]
+
+set bg_buffer_w [dbget $bg_buffer_ptr.cell.size_x]
+set bg_buffer_h [dbget $bg_buffer_ptr.cell.size_y]
+
+set vde_w [dbget $vde_ptr.cell.size_x]
+set vde_h [dbget $vde_ptr.cell.size_y]
+
+#============================================================
+# 11. Chaining the Macros
+#============================================================
+
+# Analog placement Parameter
+set analog_right_margin 20.0
+set analog_top_margin   20.0
+set macro_spacing       10.0
+
+# VR12 - upper right anchor
+set vr12_x [expr {
+    $core_urx - $analog_right_margin - $vr12_w
+}]
+set vr12_y [expr {
+    $core_ury - $analog_top_margin - $vr12_h
+}]
+
+# BGR - left of VR12, top aligned
+set bgr_x [expr {
+    $vr12_x - $macro_spacing - $bgr_w
+}]
+set bgr_y [expr {
+    $core_ury - $analog_right_margin - $bgr_h
+}]
+
+# bgr_buffer - below BGR
+set bg_buffer_x $bgr_x
+set bg_buffer_y [expr {
+    $bgr_y - $macro_spacing - $bg_buffer_h
+}]
+
+# VDE - below VR12
+set vde_x $vr12_x
+set vde_y [expr {
+    $vr12_y - $macro_spacing - $vde_h
+}]
+
+puts "VR12      : ($vr12_x, $vr12_y)"
+puts "BGR       : ($bgr_x, $bgr_y)"
+puts "BG buffer : ($bg_buffer_x, $bg_buffer_y)"
+puts "VDE       : ($vde_x, $vde_y)"
+
+#============================================================
+# 12. Analog Macro Placement
+#============================================================
+
+placeInstance $macro_vr12 $vr12_x $vr12_y 
+placeInstance $macro_bgr $bgr_x $bgr_y MY
+placeInstance $macro_bg_buffer $bg_buffer_x $bg_buffer_y MY
+placeInstance $macro_vde $vde_x $vde_y 
+
+#============================================================
+# 13. Query width and height + calculation of xy
+#============================================================
+
+set macro_hosc [find_macro_by_keyword $macro_ptrs "hosc"]
+set macro_pori [find_macro_by_keyword $macro_ptrs "pori"]
+
+set hosc_ptr    [dbget top.insts.name $macro_hosc -p]
+set pori_ptr    [dbget top.insts.name $macro_pori -p]
+
+set hosc_w [dbget $hosc_ptr.cell.size_x]
+set hosc_h [dbget $hosc_ptr.cell.size_y]
+
+# R90
+set pori_w [dbget $pori_ptr.cell.size_y]
+set pori_h [dbget $pori_ptr.cell.size_x]
+
+# pori - R90, x aligned with bgr and below bg buffer 
+set pori_x $bgr_x
+set pori_y [expr {
+    $bg_buffer_y - $macro_spacing - $pori_h
+}]
+
+# hosc - below with VDE, but separate from analog area cause it's noisy
+set noise_margin 50
+
+set hosc_x $vde_x
+set hosc_y [expr {
+    $vde_y - $noise_margin - $hosc_h
+}]
+
+puts "PORI : ($pori_x, $pori_y) R90"
+puts "HOSC : ($hosc_x, $hosc_y) R0"
+
+#Placement of HOSC and PORI
+#============================================================
+placeInstance $macro_hosc $hosc_x $hosc_y 
+placeInstance $macro_pori $pori_x $pori_y R90
+
+#============================================================
+# Digital Macro Identification
+#============================================================
+set macro_flash [find_macro_by_keyword $macro_ptrs "flash_bist"]
+set macro_sram  [find_macro_by_keyword $macro_ptrs "system_sram"]
+
+echo off
 #============================================================
 # 9. IO report
 #============================================================
