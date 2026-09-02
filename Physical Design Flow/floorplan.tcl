@@ -37,7 +37,12 @@ puts "Manufacturing grid: $mfg_grid"
 # 3. Floorplan geometry
 #============================================================
 set die_box [dbget top.fPlan.boxes]
+set die_coord [lindex [lindex $die_box 0] 0]
 set core_box [dbget top.fPlan.coreBox]
+set core_coord [lindex $core_box 0]
+lassign $die_coord die_llx die_lly die_urx die_ury
+lassign $core_coord core_llx core_lly core_urx core_ury
+
 set core_site [dbget -e top.fPlan.coreSite.name]
 
 puts ""
@@ -114,12 +119,12 @@ proc report_instance { inst_name } {
 #============================================================
 # 6. Identify Required IO
 #============================================================
-set io_vdd    [find_io_by_keyword $io_insts "vdd"]
-set io_vcc    [find_io_by_keyword $io_insts "vcc"]
-set io_vss    [find_io_by_keyword $io_insts "vss"]
-set io_scirst [find_io_by_keyword $io_insts "scirst"]
-set io_sciclk [find_io_by_keyword $io_insts "sciclk"]
-set io_sciio  [find_io_by_keyword $io_insts "sciio"]
+set io_vdd    [find_io_by_keyword $io_ptrs "vdd"]
+set io_vcc    [find_io_by_keyword $io_ptrs "vcc"]
+set io_vss    [find_io_by_keyword $io_ptrs "vss"]
+set io_scirst [find_io_by_keyword $io_ptrs "scirst"]
+set io_sciclk [find_io_by_keyword $io_ptrs "sciclk"]
+set io_sciio  [find_io_by_keyword $io_ptrs "sciio"]
 
 #============================================================
 # 7. Build required IO order
@@ -134,18 +139,44 @@ set ordered_io_insts [list \
     $io_sciio \
 ]
 
-foreach inst $ordered_io_insts {
-    puts "  $inst"
-}
-
 #============================================================
-# 8. IO Placement
+# 8. Right-side IO Placement
 #============================================================
 # R0 -> N
 # R90 -> W
 # R180 -> S
 # R270 -> E
 # Rotate anti clockwise
+
+set io_orient R90
+set io_spacing 0.0
+
+# ALL pad origins align to the right edge of core 
+set io_x $core_urx 
+
+# Starting Y = 75% of the total die height 
+set die_height [expr {$die_ury - $die_lly}]
+set io_top_y    [expr { $die_lly + 0.75 * $die_height}]
+
+set cursor_y $io_top_y
+
+foreach inst $ordered_io_insts {
+    set inst_ptr [dbget -p -e top.insts.name $inst]
+    set master_width [dbget $inst_ptr.cell.size_x]
+    
+    puts "Current IO = $inst"
+    puts "Vertical height after R90 = $master_width"
+
+    # Calculate the y placement point
+    set $cursor_y [expr { $cursor_y - $master_width}]
+
+    # Place instance according to the order of the list
+    placeInstance $inst_ptr $io_x $cursor_y $io_orient  
+
+    # Move down cursor with value of space.
+    set $cursor_y [expr { $cursor_y - $io_spacing} ]
+
+}
 
 
 #============================================================
@@ -206,13 +237,4 @@ foreach inst $io_insts {
 puts ""
 puts "QUERY-ONLY FLOORPLAN SCRIPT COMPLETE"
 puts "No placement modifications performed."
-puts "============================================================"
-
-#============================================================
-# 10. Identify required IO by Keywords
-#============================================================
-
-puts ""
-puts "============================================================"
-puts " Required IO"
 puts "============================================================"
