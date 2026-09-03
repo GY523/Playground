@@ -132,6 +132,30 @@ proc report_instance { inst_name } {
 
 }
 
+proc get_combined_bbox {inst_list} {
+    set first 1
+    foreach inst $inst_list {
+        set ptr [dbget -p -e top.insts.name $inst ]
+        set bbox [dbget $ptr.box]
+
+        lassign [lindex $bbox 0] llx lly urx ury 
+
+        if {$first} {
+            set min_x $llx
+            set min_y $lly 
+            set max_x $urx
+            set max_y $ury
+            set first 0
+        } else {
+            if {$min_x > $llx} {set min_x $llx}
+            if {$min_y > $lly} {set min_y $lly}
+            if {$max_x < $urx} {set max_x $urx}
+            if {$max_y < $ury} {set max_y $ury}
+        }
+    }
+    return [list $min_x $min_y $max_x $max_y]
+}
+
 #============================================================
 # 6. Identify Required IO
 #============================================================
@@ -340,6 +364,59 @@ puts "SRAM  : ($sram_x, $sram_y) R0"
 
 placeInstance $macro_flash $flash_x $flash_y 
 placeInstance $macro_sram  $sram_x $sram_y
+
+#============================================================
+# BLOCKAGE PLACEMENT: Identify analog macros
+#============================================================
+
+set analog_macro_insts [list \
+    $macro_vr12 \
+    $macro_bgr \
+    $macro_bg_buffer\
+    $macro_vde \
+    $macro_hosc \
+    $macro_pori
+]
+
+foreach inst $analog_macro_insts {
+    set ptr [dbget -p -e top.insts.name $inst]
+    set bbox [dbget $ptr.box]
+
+    puts "$inst -> $bbox"
+}
+
+set analog_bbox [get_combined_bbox $analog_macro_insts]
+
+lassign $analog_bbox analog_llx analog_lly analog_urx analog_ury
+
+set blockage_llx [expr {
+    $analog_llx - $fp(analog_margin)
+}]
+set blockage_lly [expr {
+    $analog_lly - $fp(analog_margin)
+}]
+set blockage_urx [expr {
+    $analog_urx + $fp(analog_margin)
+}]
+set blockage_ury [expr {
+    $analog_ury + $fp(analog_margin)
+}]
+
+if {$blockage_llx < $core_llx } {set blockage_llx $core_llx}
+if {$blockage_lly < $core_lly } {set blockage_lly $core_lly}
+if {$blockage_urx > $core_urx} {set blockage_urx $core_urx}
+if {$blockage_ury > $core_ury} {set blockage_ury $core_ury}
+
+puts ""
+puts "============================================"
+puts " ANALOG REGION"
+puts "============================================"
+
+puts "Combined analog bbox : $analog_bbox"
+
+puts "Protected region     : $blockage_llx $blockage_lly $blockage_urx $blockage_ury"
+
+createPlaceBlockage -name ANALOG_REGION_BLOCKAGE -type hard -box [list $blockage_llx $blockage_lly $blockage_urx $blockage_ury]
 
 #============================================================
 # 9. IO report

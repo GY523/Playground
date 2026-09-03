@@ -109,6 +109,7 @@ set fp(io_y_ratio)         0.75
 
 set fp(analog_right_margin) 20.0
 set fp(analog_top_margin)   20.0
+set fp(analog_margin)       20.0
 
 set fp(macro_spacing)       30.0
 set fp(noise_margin)        50.0
