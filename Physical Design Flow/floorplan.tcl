@@ -1,9 +1,7 @@
 #============================================================
 # floorplan.tcl
-# Version 3 - Digital Macro Placement
+# Version 4 - Parameterized Placement
 #
-# IMPORTANT:
-#   This version must NOT modify the Innovus database.
 #============================================================
 
 #============================================================
@@ -12,8 +10,18 @@
 
 puts ""
 puts "============================================================"
-puts " FLOORPLAN VERSION 1 : IO PLACEMENT"
+puts " FLOORPLAN Version 4 - Parameterized Placement"
 puts "============================================================"
+
+#============================================================
+# 2. Load configs
+#============================================================
+set floorplan_script_dir [file dirname [file normalize [info script]]]
+source [file join $floorplan_script_dir user_scr pr_setting.tcl]
+puts "IO spacing       : $fp(io_spacing)"
+puts "Macro spacing    : $fp(macro_spacing)"
+puts "Noise margin     : $fp(noise_margin)"
+puts "Analog top margin: $fp(analog_top_margin)"
 
 #============================================================
 # 2. Design / technology information
@@ -39,13 +47,13 @@ lassign $core_coord core_llx core_lly core_urx core_ury
 
 set core_site [dbget -e top.fPlan.coreSite.name]
 
-puts ""
+puts ""   
 puts "Die Box           :$die_box"
 puts "Core Box          : $core_box"
 puts "Core site         : $core_site"
 
 #============================================================
-# 4. Discover Physical Objects
+# 4. Disco ver Physical Objects
 #============================================================
 # IO instances 
 set io_ptrs [dbget top.insts.cell.baseClass pad -p2 ]
@@ -79,11 +87,11 @@ proc find_macro_by_keyword {macro_ptrs keyword} {
     set matches [dbget -e $macro_ptrs.name "*$keyword*"]
 
     if { [llength $matches ] == 0} {
-        error "IO ERROR : no pad isntance matched keyword: $keyword"
+        error "MACRO ERROR : no pad isntance matched keyword: $keyword"
     }
 
     if {[llength $matches] > 1} {
-        error "IO ERROR: Multiple PAD instances matched keyword '$keyword': $matches"
+        error "MACRO ERROR: Multiple PAD instances matched keyword '$keyword': $matches"
     }
 
     return [lindex $matches 0]
@@ -156,9 +164,6 @@ set ordered_io_insts [list \
 # R270 -> E
 # Rotate anti clockwise
 
-set io_orient R90
-set io_spacing 0.0
-
 # ALL pad origins align to the right edge of core 
 set io_x $core_urx 
 
@@ -179,10 +184,10 @@ foreach inst $ordered_io_insts {
     set cursor_y [expr { $cursor_y - $master_width}]
 
     # Place instance according to the order of the list
-    placeInstance $inst_ptr $io_x $cursor_y $io_orient  
+    placeInstance $inst_ptr $io_x $cursor_y $fp(io_orient)
 
     # Move down cursor with value of space.
-    set cursor_y [expr { $cursor_y - $io_spacing} ]
+    set cursor_y [expr { $cursor_y - $fp(io_spacing) } ]
 
 }
 
@@ -221,37 +226,34 @@ set vde_h [dbget $vde_ptr.cell.size_y]
 # 11. Chaining the Macros
 #============================================================
 
-# Analog placement Parameter
-set analog_right_margin 20.0
-set analog_top_margin   20.0
-set macro_spacing       30.0
+# Analog placement Parameter at pr_settings.tcl
 
 # VR12 - upper right anchor
 set vr12_x [expr {
-    $core_urx - $analog_right_margin - $vr12_w
+    $core_urx - $fp(analog_right_margin) - $vr12_w
 }]
 set vr12_y [expr {
-    $core_ury - $analog_top_margin - $vr12_h
+    $core_ury - $fp(analog_top_margin) - $vr12_h
 }]
 
 # BGR - left of VR12, top aligned
 set bgr_x [expr {
-    $vr12_x - $macro_spacing - $bgr_w
+    $vr12_x - $fp(macro_spacing) - $bgr_w
 }]
 set bgr_y [expr {
-    $core_ury - $analog_right_margin - $bgr_h
+    $core_ury - $fp(analog_top_margin) - $bgr_h
 }]
 
 # bgr_buffer - below BGR
 set bg_buffer_x $bgr_x
 set bg_buffer_y [expr {
-    $bgr_y - $macro_spacing - $bg_buffer_h
+    $bgr_y - $fp(macro_spacing) - $bg_buffer_h
 }]
 
 # VDE - below VR12
 set vde_x $vr12_x
 set vde_y [expr {
-    $vr12_y - $macro_spacing - $vde_h
+    $vr12_y - $fp(macro_spacing) - $vde_h
 }]
 
 puts "VR12      : ($vr12_x, $vr12_y)"
@@ -288,15 +290,13 @@ set pori_h [dbget $pori_ptr.cell.size_x]
 # pori - R90, x aligned with bgr and below bg buffer 
 set pori_x $bgr_x
 set pori_y [expr {
-    $bg_buffer_y - $macro_spacing - $pori_h
+    $bg_buffer_y - $fp(macro_spacing) - $pori_h
 }]
 
 # hosc - below with VDE, but separate from analog area cause it's noisy
-set noise_margin 50
-
 set hosc_x $vde_x
 set hosc_y [expr {
-    $vde_y - $noise_margin - $hosc_h
+    $vde_y - $fp(noise_margin) - $hosc_h
 }]
 
 puts "PORI : ($pori_x, $pori_y) R90"
@@ -323,9 +323,6 @@ set flash_h [dbget $flash_ptr.cell.size_y]
 set sram_w  [dbget $sram_ptr.cell.size_x]
 set sram_h  [dbget $sram_ptr.cell.size_y]
 
-# set margin
-set digital_macro_margin 20.0
-
 # set xy
 set flash_x $core_llx
 set flash_y [expr {
@@ -333,10 +330,10 @@ set flash_y [expr {
 }]
 
 set sram_x [expr {
-    $core_urx - $digital_macro_margin - $sram_w
+    $core_urx - $fp(digital_macro_margin) - $sram_w
 }]
 set sram_y [expr {
-    $core_lly + $digital_macro_margin
+    $core_lly + $fp(digital_macro_margin)
 }]
 puts "Flash : ($flash_x, $flash_y) R0"
 puts "SRAM  : ($sram_x, $sram_y) R0"
@@ -344,7 +341,6 @@ puts "SRAM  : ($sram_x, $sram_y) R0"
 placeInstance $macro_flash $flash_x $flash_y 
 placeInstance $macro_sram  $sram_x $sram_y
 
-echo off
 #============================================================
 # 9. IO report
 #============================================================
