@@ -628,6 +628,47 @@ create_macro_density_blockages $macro_flash FLASH \
     $fp(corner_blockage_size) \
     $core_coord
 
+set digital_macro_insts [list $macro_flash $macro_sram]
+
+# reset
+deleteHaloFromBlock -allMacro   
+deleteRoutingHalo -inst $digital_macro_insts
+
+# Add halo to Digital Macro
+foreach inst $digital_macro_insts {
+    addHaloToBlock [list $fp(place_halo) $fp(place_halo) $fp(place_halo) $fp(place_halo)] \
+        $inst
+}
+
+foreach inst $digital_macro_insts {
+
+    set ptr [dbget -p -e top.insts.name $inst]
+
+    puts "Placement halo: $inst"
+    puts "  Left   : [dbget $ptr.pHaloLeft]"
+    puts "  Bottom : [dbget $ptr.pHaloBot]"
+    puts "  Right  : [dbget $ptr.pHaloRight]"
+    puts "  Top    : [dbget $ptr.pHaloTop]"
+}
+
+foreach inst $digital_macro_insts {
+    set ptr [dbget -p -e top.insts.name $inst]
+
+    set obs_layers [dbget $ptr.cell.layerShapeObstructions.layer.name]
+    puts " $inst OBS layers: $obs_layers"
+    set route_top [lindex $obs_layers 0]
+    set route_bottom [lindex $obs_layers end]
+
+    puts ""
+    puts "Adding routing halo: $inst"
+    puts "  Space  : $fp(route_halo)"
+    puts "  Bottom : $route_bottom"
+    puts "  Top    : $route_top"
+
+    addRoutingHalo -inst $inst -bottom $route_bottom -top $route_top -space $fp(route_halo)
+    
+}
+
 #============================================================
 # 9. IO report
 #============================================================

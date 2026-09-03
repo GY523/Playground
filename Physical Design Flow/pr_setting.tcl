@@ -119,6 +119,8 @@ set fp(side_density)    60
 set fp(corner_density)  30
 
 # Physical size of blockage regions
+# Density blockage demensions are measured from the macro boundary.
+# They may overlap the placement halo intentionally.
 set fp(side_blockage_width)     20.0
 set fp(corner_blockage_size)    20.0
 
@@ -127,3 +129,13 @@ set fp(corner_blockage_size)    20.0
 #------------------------------------------------------------
 
 set fp(digital_macro_margin) 20.0
+
+#------------------------------------------------------------
+# Macro halos
+#------------------------------------------------------------
+# Placement keepout around digital macros
+set fp(place_halo) 5.0
+set fp(route_halo) 5.0
+
+# Routing halo
+set fp(route_halo_space)        <TODO>
