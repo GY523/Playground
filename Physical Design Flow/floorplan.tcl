@@ -344,8 +344,9 @@ set sram_ptr [dbget top.insts.name $macro_sram -p]
 # get width and height: no rotation
 set flash_w [dbget $flash_ptr.cell.size_x]
 set flash_h [dbget $flash_ptr.cell.size_y]
-set sram_w  [dbget $sram_ptr.cell.size_x]
-set sram_h  [dbget $sram_ptr.cell.size_y]
+# R270
+set sram_w  [dbget $sram_ptr.cell.size_y]
+set sram_h  [dbget $sram_ptr.cell.size_x]
 
 # set xy
 set flash_x $core_llx
@@ -360,10 +361,10 @@ set sram_y [expr {
     $core_lly + $fp(digital_macro_margin)
 }]
 puts "Flash : ($flash_x, $flash_y) R0"
-puts "SRAM  : ($sram_x, $sram_y) R0"
+puts "SRAM  : ($sram_x, $sram_y) R270"
 
 placeInstance $macro_flash $flash_x $flash_y 
-placeInstance $macro_sram  $sram_x $sram_y
+placeInstance $macro_sram  $sram_x $sram_y R270
 
 #============================================================
 # BLOCKAGE PLACEMENT: Identify analog macros
