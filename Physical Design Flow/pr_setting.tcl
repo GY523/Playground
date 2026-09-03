@@ -115,8 +115,8 @@ set fp(macro_spacing)       30.0
 set fp(noise_margin)        50.0
 
 # Partial Blockage Density
-set fp(side_density)    30.0
-set fp(corner_density)  60.0
+set fp(side_density)    60
+set fp(corner_density)  30
 
 # Physical size of blockage regions
 set fp(side_blockage_width)     20.0

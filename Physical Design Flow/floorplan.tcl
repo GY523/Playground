@@ -156,6 +156,192 @@ proc get_combined_bbox {inst_list} {
     return [list $min_x $min_y $max_x $max_y]
 }
 
+proc clip_box_to_core {box core_box} {
+    lassign $box llx lly urx ury
+    lassign $core_box core_llx core_lly core_urx core_ury
+
+    if { $llx < $core_llx } {set llx $core_llx }
+    if {$lly < $core_lly } {set lly $core_lly}
+    if {$urx > $core_urx } { set urx $core_urx}
+    if { $ury > $core_ury } { set ury $core_ury}
+     
+    # If clipping completely removes the box, return empty list.
+    if { $llx >= $urx || $lly >= $ury } {return {}}
+
+    return [list $llx $lly $urx $ury]
+}
+
+# small helper to find the min value
+proc min_value {a b} {
+    if {$a < $b} {
+        return $a
+    } else {
+        return $b
+    }
+}
+
+proc create_macro_density_blockages {
+    inst_name
+    prefix
+    side_density
+    corner_density
+    side_width
+    corner_size
+    core_box
+} {
+    #--------------------------------------------------------
+    # Get macro instance pointer and actual placed macro bbox
+    #--------------------------------------------------------
+    set inst_ptr [dbget -p -e top.insts.name $inst_name]
+
+    if {[llength $inst_ptr ] ==0} {
+        error "BLOCKAGE ERROR: Instance not found: $inst_name"
+    }
+
+    set bbox [dbget $inst_ptr.box]
+
+    lassign [lindex $bbox 0] llx lly urx ury
+
+    lassign $core_box core_llx core_lly core_urx core_ury
+
+    puts ""
+    puts "============================================"
+    puts " MACRO DENSITY BLOCKAGE : $prefix"
+    puts "============================================"
+    puts "Instance : $inst_name"
+    puts "BBox     : $llx $lly $urx $ury"
+
+    #========================================================
+    # 1. Side blockages
+    #
+    # Innovus generates these relative to the actual instance.
+    #========================================================
+
+    set avail_left  [expr $llx - $core_llx]
+    set avail_bottom [expr $lly - $core_lly]
+    set avail_right [expr $core_urx - $urx]
+    set avail_top   [expr $core_ury - $ury]
+
+    set left_w [min_value $side_width $avail_left]
+    set bottom_w [min_value $side_width $avail_bottom]
+    set right_w [min_value $side_width $avail_right]
+    set top_w [min_value $side_width $avail_top]
+
+    if {$left_w >0 } {
+        createPlaceBlockage \
+        -name ${prefix}_SIDE_LEFT \
+        -type partial \
+        -density $side_density \
+        -inst $inst_ptr \
+        -outerRingBySide [list $side_width 0 0 0]
+    }
+    
+    if {$bottom_w > 0 } { 
+        createPlaceBlockage \
+        -name ${prefix}_SIDE_BOTTOM \
+        -type partial \
+        -density $side_density \
+        -inst $inst_ptr \
+        -outerRingBySide [list 0 $side_width 0 0]
+    }
+    
+    if {$right_w > 0} {
+        createPlaceBlockage \
+        -name ${prefix}_SIDE_RIGHT \
+        -type partial \
+        -density $side_density \
+        -inst $inst_ptr \
+        -outerRingBySide [list 0 0 $side_width 0]
+    }
+    
+    if {$top_w > 0 } {
+        createPlaceBlockage \
+        -name ${prefix}_SIDE_TOP \
+        -type partial \
+        -density $side_density \
+        -inst $inst_ptr \
+        -outerRingBySide [list 0 0 0 $side_width]
+    }
+    
+  
+    #========================================================
+    # 2. Corner blockage geometry
+    #========================================================
+    set corner_ll [list \
+        [expr {$llx - $corner_size}] \
+        [expr {$lly - $corner_size}] \
+        $llx \
+        $lly \
+    ]
+
+    set corner_lr [list \
+        $urx \
+        [expr {$lly - $corner_size}] \
+        [expr {$urx + $corner_size}] \
+        $lly \
+    ]
+
+    set corner_ul [list \
+        [expr {$llx - $corner_size}] \
+        $ury \
+        $llx \
+        [expr {$ury + $corner_size}] \
+    ]
+
+    set corner_ur [list \
+        $urx \
+        $ury \
+        [expr {$urx + $corner_size}] \
+        [expr {$ury + $corner_size}] \
+    ]
+
+    #========================================================
+    # 3. Clip corner boxes to the core
+    #========================================================
+    set corner_ll [clip_box_to_core $corner_ll $core_box]
+    set corner_lr [clip_box_to_core $corner_lr $core_box]
+    set corner_ul [clip_box_to_core $corner_ul $core_box]
+    set corner_ur [clip_box_to_core $corner_ur $core_box]
+
+    #========================================================
+    # 4. Create corner blockages
+    #========================================================
+
+    if {[llength $corner_ll ] != 0} {
+        createPlaceBlockage \
+            -name ${prefix}_CORNER_LL \
+            -type partial \
+            -density $corner_density \
+            -box $corner_ll
+    }
+    if {[llength $corner_lr] != 0} {
+        createPlaceBlockage \
+            -name ${prefix}_CORNER_LR \
+            -type partial \
+            -density $corner_density \
+            -box $corner_lr
+    }
+    if {[llength $corner_ul] != 0} {
+
+        createPlaceBlockage \
+            -name ${prefix}_CORNER_UL \
+            -type partial \
+            -density $corner_density \
+            -box $corner_ul
+    }
+    if {[llength $corner_ur] != 0} {
+
+        createPlaceBlockage \
+            -name ${prefix}_CORNER_UR \
+            -type partial \
+            -density $corner_density \
+            -box $corner_ur
+    }
+
+    puts "Density blockages created for $inst_name"
+}
+
+
 #============================================================
 # 6. Identify Required IO
 #============================================================
@@ -420,6 +606,29 @@ puts "Protected region     : $blockage_llx $blockage_lly $blockage_urx $blockage
 createPlaceBlockage -name ANALOG_REGION_BLOCKAGE -type hard -box [list $blockage_llx $blockage_lly $blockage_urx $blockage_ury]
 
 #============================================================
+# PARTIAL DENSITY BLOCKAGE - SRAM PROTOTYPE
+#============================================================
+
+# Reset
+deletePlaceBlockage -type partial
+# SRAM
+create_macro_density_blockages $macro_sram \
+    SRAM \
+    $fp(side_density)\
+    $fp(corner_density)\
+    $fp(side_blockage_width) \
+    $fp(corner_blockage_size) \
+    $core_coord
+
+# Flash Bist
+create_macro_density_blockages $macro_flash FLASH \
+    $fp(side_density)\
+    $fp(corner_density)\
+    $fp(side_blockage_width) \
+    $fp(corner_blockage_size) \
+    $core_coord
+
+#============================================================
 # 9. IO report
 #============================================================
 
@@ -475,6 +684,5 @@ foreach inst $io_insts {
 }
 
 puts ""
-puts "QUERY-ONLY FLOORPLAN SCRIPT COMPLETE"
-puts "No placement modifications performed."
+puts "FLOORPLAN SCRIPT COMPLETE"
 puts "============================================================"
