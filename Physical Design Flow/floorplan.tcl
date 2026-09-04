@@ -53,7 +53,7 @@ puts "Core Box          : $core_box"
 puts "Core site         : $core_site"
 
 #============================================================
-# 4. Disco ver Physical Objects
+# 4. Discover Physical Objects
 #============================================================
 # IO instances 
 set io_ptrs [dbget top.insts.cell.baseClass pad -p2 ]
@@ -341,6 +341,29 @@ proc create_macro_density_blockages {
     puts "Density blockages created for $inst_name"
 }
 
+proc get_macro_obs_routing_range {inst_name} {
+    set ptr [dbget -p -e top.insts.name $inst_name]
+
+    set obs_layers [dbget $ptr.cell.layerShapeObstructions.layer.name]
+    foreach layer $obs_layers {
+        set layer_ptr [dbget head.layers.name $layer -p -e]
+        if {[dbget $layer_ptr.type] ne "routing" } continue \
+        else {
+            set route_top $layer
+            break
+        }
+	}
+    for {set i [expr [llength $obs_layers] - 1 ] } {$i > 0} { incr i -1} {
+        set layer [lindex $obs_layers $i]
+        set layer_ptr [dbget head.layers.name $layer -p -e]
+        if {[dbget $layer_ptr.type] ne "routing"} continue \
+        else {
+            set route_bottom $layer
+            break
+        }
+    }  
+    return [list $route_top $route_bottom] 
+}
 
 #============================================================
 # 6. Identify Required IO
@@ -652,12 +675,7 @@ foreach inst $digital_macro_insts {
 }
 
 foreach inst $digital_macro_insts {
-    set ptr [dbget -p -e top.insts.name $inst]
-
-    set obs_layers [dbget $ptr.cell.layerShapeObstructions.layer.name]
-    puts " $inst OBS layers: $obs_layers"
-    set route_top [lindex $obs_layers 0]
-    set route_bottom [lindex $obs_layers end]
+    lassign [get_macro_obs_routing_range $inst] route_top route_bottom
 
     puts ""
     puts "Adding routing halo: $inst"
@@ -699,7 +717,7 @@ puts "============================================================"
 set macro_found 0
 
 foreach inst $macro_insts {
-
+    
     if {[report_instance $inst]} { 
         incr macro_found
     }
