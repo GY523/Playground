@@ -135,7 +135,6 @@ set fp(digital_macro_margin) 20.0
 #------------------------------------------------------------
 # Placement keepout around digital macros
 set fp(place_halo) 5.0
-set fp(route_halo) 5.0
 
 # Routing halo
-set fp(route_halo_space)        <TODO>
+set fp(route_halo) 5.0
